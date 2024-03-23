@@ -1,0 +1,18 @@
+{
+  "name": "converse-backend",
+  "version": "1.0.0",
+  "description": "Our chat application is a real-time communication platform built using the MERN stack (MongoDB, Express.js, React.js, Node.js) with WebSocket integration. It allows users to engage in private messaging, group chats, and receive real-time notifications about typing and online statuses. The application supports authentication for secure access and ensures message delivery with read receipts (ticks). With a user-friendly interface and robust backend, our chat app provides a seamless and interactive communication experience.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon src/index.js"
+  },
+  "author": "preksha jain",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.1",
+    "nodemon": "^3.1.0"
+  }
+}
