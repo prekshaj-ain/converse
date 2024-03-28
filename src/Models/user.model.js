@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    name: {
+      type: String,
+      trim: true,
+    },
     email: {
       type: String,
       required: true,
@@ -29,9 +33,17 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
     googleId: {
-      type: string,
+      type: String,
       unique: true,
       sparse: true,
+    },
+    facebookId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    refreshToken: {
+      type: String,
     },
     bio: {
       type: String,
