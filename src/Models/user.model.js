@@ -78,9 +78,16 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 };
 
 userSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ _id: this._id, email: this.email }, JWT_ACCESS_SECRET, {
-    expiresIn: JWT_ACCESS_EXPIRY,
-  });
+  const refreshToken = jwt.sign(
+    { _id: this._id, email: this.email },
+    JWT_ACCESS_SECRET,
+    {
+      expiresIn: JWT_ACCESS_EXPIRY,
+    }
+  );
+  this.refreshToken = refreshToken;
+  this.save();
+  return refreshToken;
 };
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign({ _id: this._id, email: this.email }, JWT_REFRESH_SECRET, {
