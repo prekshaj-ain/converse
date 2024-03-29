@@ -1,18 +1,29 @@
 const passport = require("passport");
 const { JWT_ACCESS_SECRET } = require("../Config/serverConfig");
+const User = require("../Models/user.model");
 
-const JwtStrategy = require("passport-jwt").Strategy,
-  ExtractJwt = require("passport-jwt").ExtractJwt;
+const JwtStrategy = require("passport-jwt").Strategy;
 
+const jwtFromRequest = (req) => {
+  let token = null;
+  if (req.cookies && req.cookies.accessToken) {
+    token = req.cookies.accessToken;
+  } else if (req.headers.authorization) {
+    token = req.headers.authorization.replace("Bearer ", "");
+  }
+  return token;
+};
 passport.use(
   new JwtStrategy(
     {
-      jwtFromRequest: ExtractJwt.fromHeader("Bearer"),
+      jwtFromRequest,
       secretOrKey: JWT_ACCESS_SECRET,
     },
     async (payload, done) => {
       try {
-        const user = await User.findById(payload.id);
+        const user = await User.findById(payload.id).select(
+          "-password -refreshToken"
+        );
 
         if (user) {
           done(null, user);
