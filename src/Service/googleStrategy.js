@@ -2,6 +2,11 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 const User = require("../Models/user.model");
+const {
+  GOOGLE_CLIENT_SECRET,
+  GOOGLE_CLIENT_ID,
+  SERVER_URL,
+} = require("../Config/serverConfig");
 
 passport.use(
   new GoogleStrategy(
@@ -13,7 +18,9 @@ passport.use(
     async function (accessToken, refreshToken, profile, done) {
       console.log(profile);
       try {
-        const oldUser = await User.findOne({ email: profile.email });
+        const oldUser = await User.findOne({ email: profile.email }).select(
+          "-refreshToken -googleId"
+        );
 
         if (oldUser) {
           return done(null, oldUser);
@@ -29,6 +36,7 @@ passport.use(
           name: profile.displayName,
           avatar: profile.picture,
         });
+        delete newUser.googleId;
         done(null, newUser);
       } catch (err) {
         console.log(err);
