@@ -1,15 +1,27 @@
 const { default: mongoose } = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const {
   JWT_ACCESS_EXPIRY,
   JWT_ACCESS_SECRET,
   JWT_REFRESH_EXPIRY,
   JWT_REFRESH_SECRET,
 } = require("../Config/serverConfig");
+const {
+  USER_TEMPORARY_TOKEN_EXPIRY,
+  AvailableSocialLogins,
+  UserLoginType,
+} = require("../constants");
 
-const userSchema = new mongoose.Schema(
+const userSchema = new Schema(
   {
+    avatar: {
+      type: {
+        url: String,
+        localPath: String,
+      },
+    },
     username: {
       type: String,
       required: true,
@@ -18,50 +30,42 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    name: {
-      type: String,
-      trim: true,
-    },
     email: {
       type: String,
       required: true,
       unique: true,
-      lowecase: true,
+      lowercase: true,
       trim: true,
     },
     password: {
       type: String,
+      required: [true, "Password is required"],
     },
-    googleId: {
+    loginType: {
       type: String,
-      unique: true,
-      sparse: true,
+      enum: AvailableSocialLogins,
+      default: UserLoginType.EMAIL_PASSWORD,
     },
-    facebookId: {
-      type: String,
-      unique: true,
-      sparse: true,
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
     },
     refreshToken: {
       type: String,
     },
-    bio: {
+    emailVerificationToken: {
       type: String,
     },
-    avatar: {
-      type: String,
-    },
-    lastSeen: {
+    emailVerificationExpiry: {
       type: Date,
-      default: Date.now,
     },
   },
   { timestamps: true }
 );
 
 userSchema.pre("save", async function (next) {
-  // Check if the password field is modified and exists
-  if (this.isModified("password") && this.password) {
+  // Check if the password field is modifie
+  if (this.isModified("password")) {
     try {
       // Hash the password using bcrypt
       const hashedPassword = await bcrypt.hash(this.password, 10);
@@ -78,21 +82,40 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 };
 
 userSchema.methods.generateAccessToken = function () {
+  return jwt.sign({ _id: this._id, email: this.email }, JWT_ACCESS_SECRET, {
+    expiresIn: JWT_ACCESS_EXPIRY,
+  });
+};
+userSchema.methods.generateRefreshToken = function () {
   const refreshToken = jwt.sign(
     { _id: this._id, email: this.email },
-    JWT_ACCESS_SECRET,
+    JWT_REFRESH_SECRET,
     {
-      expiresIn: JWT_ACCESS_EXPIRY,
+      expiresIn: JWT_REFRESH_EXPIRY,
     }
   );
   this.refreshToken = refreshToken;
   this.save();
   return refreshToken;
 };
-userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign({ _id: this._id, email: this.email }, JWT_REFRESH_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRY,
-  });
+
+/**
+ * @description Method responsible for generating tokens for email verification, password reset etc.
+ */
+userSchema.methods.generateTemporaryToken = function () {
+  // This token should be client facing
+  // for example: for email verification unHashedToken should go into the user's mail
+  const unHashedToken = crypto.randomBytes(20).toString("hex");
+
+  // This should stay in the DB to compare at the time of verification
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(unHashedToken)
+    .digest("hex");
+  // This is the expiry time for the token (20 minutes)
+  const tokenExpiry = Date.now() + USER_TEMPORARY_TOKEN_EXPIRY;
+
+  return { unHashedToken, hashedToken, tokenExpiry };
 };
 
 const User = mongoose.model("User", userSchema);
