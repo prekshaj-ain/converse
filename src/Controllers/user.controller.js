@@ -1,5 +1,6 @@
 const { NODE_ENV, CLIENT_SSO_REDIRECT_URL } = require("../Config/serverConfig");
 const User = require("../Models/user.model");
+const crypto = require("crypto");
 const ApiError = require("../Utils/ApiError");
 const ApiResponse = require("../Utils/ApiResponse");
 const asyncHandler = require("../Utils/asyncHandler");
@@ -246,9 +247,74 @@ const refreshToken = asyncHandler(async (req, res) => {
   }
 });
 
-const verifyEmail = asyncHandler((req, res) => {});
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { verificationToken } = req.params;
 
-const resendVerificationEmail = asyncHandler((req, res) => {});
+  if (!verificationToken) {
+    throw new ApiError(400, "Email verification token is missing");
+  }
+
+  // generate a hash from the token that we are receiving
+  let hashedToken = crypto
+    .createHash("sha256")
+    .update(verificationToken)
+    .digest("hex");
+
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpiry: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new ApiError(489, "Token is invalid or expired");
+  }
+
+  // If we found the user that means the token is valid
+  // Now we can remove the associated email token and expiry date as we no  longer need them
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpiry = undefined;
+  // Turn the email verified flag to `true`
+  user.isEmailVerified = true;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { isEmailVerified: true }, "Email is verified"));
+});
+
+const resendVerificationEmail = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user?._id);
+
+  if (!user) {
+    throw new ApiError(404, "User does not exists", []);
+  }
+
+  // if email is already verified throw an error
+  if (user.isEmailVerified) {
+    throw new ApiError(409, "Email is already verified!");
+  }
+
+  const { unHashedToken, hashedToken, tokenExpiry } =
+    user.generateTemporaryToken(); // generate email verification creds
+
+  user.emailVerificationToken = hashedToken;
+  user.emailVerificationExpiry = tokenExpiry;
+  await user.save({ validateBeforeSave: false });
+
+  await sendEmail({
+    email: user?.email,
+    subject: "Please verify your email",
+    mailgenContent: emailVerificationMailgenContent(
+      user.username,
+      `${req.protocol}://${req.get(
+        "host"
+      )}/api/v1/users/verify-email/${unHashedToken}`
+    ),
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Mail has been sent to your mail ID"));
+});
 
 const getCurrentUser = asyncHandler((req, res) => {});
 
