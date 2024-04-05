@@ -11,9 +11,12 @@ const {
   verifyEmail,
   logoutUser,
   handleSocialLogin,
+  getCurrentUser,
+  updateUserAvatar,
 } = require("../Controllers/user.controller");
 const { verifyJWT } = require("../Middlewares/auth.middleware");
 const passport = require("passport");
+const { upload } = require("../Middlewares/multer.middleware");
 
 const router = Router();
 
@@ -25,6 +28,10 @@ router.route("/verify-email/:verificationToken").get(verifyEmail);
 
 // Secured routes
 router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/current-user").get(verifyJWT, getCurrentUser);
+router
+  .route("/avatar")
+  .patch(verifyEmail, upload.single("avatar"), updateUserAvatar);
 
 // SSO routes
 router.route("/google").get(
