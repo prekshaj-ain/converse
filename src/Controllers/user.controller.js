@@ -5,6 +5,11 @@ const ApiError = require("../Utils/ApiError");
 const ApiResponse = require("../Utils/ApiResponse");
 const asyncHandler = require("../Utils/asyncHandler");
 const { UserLoginType } = require("../constants");
+const {
+  removeLocalFile,
+  getStaticFilePath,
+  getLocalPath,
+} = require("../Utils/handleFile");
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -282,43 +287,47 @@ const verifyEmail = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { isEmailVerified: true }, "Email is verified"));
 });
 
-const resendVerificationEmail = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user?._id);
-
-  if (!user) {
-    throw new ApiError(404, "User does not exists", []);
-  }
-
-  // if email is already verified throw an error
-  if (user.isEmailVerified) {
-    throw new ApiError(409, "Email is already verified!");
-  }
-
-  const { unHashedToken, hashedToken, tokenExpiry } =
-    user.generateTemporaryToken(); // generate email verification creds
-
-  user.emailVerificationToken = hashedToken;
-  user.emailVerificationExpiry = tokenExpiry;
-  await user.save({ validateBeforeSave: false });
-
-  await sendEmail({
-    email: user?.email,
-    subject: "Please verify your email",
-    mailgenContent: emailVerificationMailgenContent(
-      user.username,
-      `${req.protocol}://${req.get(
-        "host"
-      )}/api/v1/users/verify-email/${unHashedToken}`
-    ),
-  });
+const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Mail has been sent to your mail ID"));
+    .json(new ApiResponse(200, req.user, "Current user fetched successfully"));
 });
 
-const getCurrentUser = asyncHandler((req, res) => {});
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  if (!req.file?.filename) {
+    throw new ApiError(400, "Avatar image is required");
+  }
 
-const updateUserAvatar = asyncHandler((req, res) => {});
+  // get avatar file system url and local path
+  const avatarUrl = getStaticFilePath(req, req.file?.filename);
+  const avatarLocalPath = getLocalPath(req.file?.filename);
+
+  const user = await User.findById(req.user._id);
+
+  let updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+
+    {
+      $set: {
+        // set the newly uploaded avatar
+        avatar: {
+          url: avatarUrl,
+          localPath: avatarLocalPath,
+        },
+      },
+    },
+    { new: true }
+  ).select(
+    "-password -refreshToken -emailVerificationToken -emailVerificationExpiry"
+  );
+
+  // remove the old avatar
+  removeLocalFile(user.avatar.localPath);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Avatar updated successfully"));
+});
 
 module.exports = {
   loginUser,
@@ -329,5 +338,4 @@ module.exports = {
   verifyEmail,
   getCurrentUser,
   updateUserAvatar,
-  resendVerificationEmail,
 };
