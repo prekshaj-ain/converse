@@ -87,16 +87,9 @@ userSchema.methods.generateAccessToken = function () {
   });
 };
 userSchema.methods.generateRefreshToken = function () {
-  const refreshToken = jwt.sign(
-    { _id: this._id, email: this.email },
-    JWT_REFRESH_SECRET,
-    {
-      expiresIn: JWT_REFRESH_EXPIRY,
-    }
-  );
-  this.refreshToken = refreshToken;
-  this.save();
-  return refreshToken;
+  return jwt.sign({ _id: this._id, email: this.email }, JWT_REFRESH_SECRET, {
+    expiresIn: JWT_REFRESH_EXPIRY,
+  });
 };
 
 /**
