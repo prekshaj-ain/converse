@@ -2,11 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const passport = require("passport");
+const session = require("express-session");
+const { createServer } = require("http");
 
 const { CORS_ORIGIN } = require("./Config/serverConfig");
-const authRoute = require("./Routes/Auth/index");
 
 const app = express();
+
+const httpServer = createServer(app);
 
 app.use(
   cors({
@@ -20,12 +23,15 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
+// required for passport
+app.use(
+  session({
+    secret: process.env.EXPRESS_SESSION_SECRET,
+    resave: true,
+    saveUninitialized: true,
+  })
+); // session secret
 app.use(passport.initialize());
-require("./Service/facebookStrategy");
-require("./Service/googleStrategy");
-require("./Service/jwtStrategy");
-require("./Service/localStrategy");
+app.use(passport.session()); // persistent login sessions
 
-app.use("/auth", authRoutes);
-
-module.exports = app;
+module.exports = httpServer;
