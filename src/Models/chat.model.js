@@ -26,7 +26,10 @@ const chatSchema = new Schema(
       ref: "User",
     },
     image: {
-      type: string,
+      type: {
+        url: String,
+        localPath: String,
+      },
     },
     description: {
       type: string,
