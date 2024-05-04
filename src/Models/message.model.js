@@ -1,6 +1,21 @@
+const { Schema } = require("mongoose");
 const mongoose = require("mongoose");
 
-const MessageSchema = new mongoose.Schema(
+const readByRecipientSchema = new mongoose.Schema(
+  {
+    _id: false,
+    readByUserId: String,
+    readAt: {
+      type: Date,
+      default: Date.now(),
+    },
+  },
+  {
+    timestamps: false,
+  }
+);
+
+const MessageSchema = new Schema(
   {
     sender: {
       type: Schema.Types.ObjectId,
@@ -22,6 +37,7 @@ const MessageSchema = new mongoose.Schema(
       type: Schema.Types.ObjectId,
       ref: "Chat",
     },
+    readByRecipients: [readByRecipientSchema],
   },
   { timestamps: true }
 );
