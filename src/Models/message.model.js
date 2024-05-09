@@ -4,7 +4,10 @@ const mongoose = require("mongoose");
 const readByRecipientSchema = new mongoose.Schema(
   {
     _id: false,
-    readByUserId: String,
+    readByUserId: {
+      type: Schema.Tyles.ObjectId,
+      ref: "User",
+    },
     readAt: {
       type: Date,
       default: Date.now(),
@@ -23,6 +26,7 @@ const MessageSchema = new Schema(
     },
     content: {
       type: String,
+      trim: true,
     },
     attachments: {
       type: [
