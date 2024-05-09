@@ -1,6 +1,8 @@
+const { default: mongoose } = require("mongoose");
 const Chat = require("../Models/chat.model.js");
 const User = require("../Models/user.model.js");
 const ApiError = require("../Utils/ApiError.js");
+const ApiResponse = require("../Utils/ApiResponse.js");
 const asyncHandler = require("../Utils/asyncHandler.js");
 const { ChatEventEnum } = require("../constants.js");
 const { emitSocketEvent } = require("../socket/index.js");
@@ -203,7 +205,86 @@ const createAGroupChat = asyncHandler(async (req, res) => {
     .status(201)
     .json(new ApiResponse(201, payload, "Group chat created successfully"));
 });
+
+const getGroupChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const groupChat = await Chat.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(chatId),
+        isGroupChat: true,
+      },
+    },
+    ...chatCommonAggregation(),
+  ]);
+  const chat = groupChat[0];
+
+  if (!chat) {
+    throw new ApiError(404, "Group chat does not exist");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, chat, "Group chat retrieved successfully"));
+});
+
+const renameGroupChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { name } = req.body;
+  // find Chat
+  const groupChat = await Chat.findOne({
+    _id: new mongoose.Types.ObjectId(chatId),
+    isGroupChat: false,
+  });
+  if (!groupChat) {
+    throw new ApiError(404, "Group chat does not exist");
+  }
+  // check if user is admin for this chat
+  if (req.user._id.toString() != groupChat.admin?.toString()) {
+    throw new ApiError(400, "You are not admin for this group chat");
+  }
+  const updatedGroupChat = await Chat.findByIdAndUpdate(
+    chatId,
+    {
+      $set: {
+        name: name,
+      },
+    },
+    { new: true }
+  );
+
+  const chat = await Chat.aggregate([
+    {
+      $match: {
+        _id: updatedGroupChat._id,
+      },
+    },
+    ...chatCommonAggregation(),
+  ]);
+
+  const payload = chat[0];
+
+  if (!payload) {
+    throw new ApiError(500, "Internal server error");
+  }
+  payload.participants.forEach((participant) => {
+    emitSocketEvent(
+      req,
+      participant._id.toString(),
+      ChatEventEnum.UPDATE_GROUP_NAME_EVENT,
+      payload
+    );
+  });
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, payload, "Group chat name updated successfully")
+    );
+});
+
 module.exports = {
   createOrGetOneOnOneChat,
   createAGroupChat,
+  getGroupChat,
+  renameGroupChat,
 };
