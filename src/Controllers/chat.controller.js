@@ -68,6 +68,35 @@ const chatCommonAggregation = () => {
   ];
 };
 
+const searchAvailableUsers = asyncHandler(async (req, res) => {
+  const keyword = req.query.search;
+
+  const users = await User.aggregate([
+    {
+      $match: {
+        _id: {
+          $ne: req.user._id, // avoid logged in user
+        },
+        $or: [
+          { username: { $regex: req.query.search, $options: "i" } },
+          { email: { $regex: req.query.search, $options: "i" } },
+        ],
+      },
+    },
+    {
+      $project: {
+        avatar: 1,
+        username: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, users, "Users fetched successfully"));
+});
+
 const createOrGetOneOnOneChat = asyncHandler(async (req, res) => {
   const { receiverId } = req.params;
 
@@ -104,7 +133,7 @@ const createOrGetOneOnOneChat = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, chat[0], "Chat retrieved successfully"));
   }
 
-  const newOneOnOneChat = await Chat.create({
+  const newChatInstance = await Chat.create({
     name: "one on one chat",
     participants: [req.user._id, reciever._id],
     admin: req.user._id,
@@ -282,9 +311,33 @@ const renameGroupChat = asyncHandler(async (req, res) => {
     );
 });
 
+const getAllChats = asyncHandler(async (req, res) => {
+  const chats = await Chat.aggregate([
+    {
+      $match: {
+        participants: { $elemMatch: { $eq: req.user._id } }, // get all chats that have logged in user as a participant
+      },
+    },
+    {
+      $sort: {
+        updatedAt: -1,
+      },
+    },
+    ...chatCommonAggregation(),
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, chats || [], "User chats fetched successfully!")
+    );
+});
+
 module.exports = {
   createOrGetOneOnOneChat,
   createAGroupChat,
   getGroupChat,
+  getAllChats,
   renameGroupChat,
+  searchAvailableUsers,
 };
